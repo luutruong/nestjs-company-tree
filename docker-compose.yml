@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 3003:3000
+    volumes:
+      - ./:/app
+    environment:
+      MONGODB_USER: 'root'
+      MONGODB_PASSWORD: 'password'
+      MONGODB_DATABASE: 'company-tree'
+  mongodb:
+    image: mongo:5.0.12
+    volumes:
+      - ./.data/mongodb:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: 'root'
+      MONGO_INITDB_ROOT_PASSWORD: 'password'
+      MONGO_INITDB_DATABASE: 'company-tree'
+    ports:
+      - 27017:27017

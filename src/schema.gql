@@ -1,0 +1,58 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Company {
+  children: [Company!]
+  cost: Float!
+  createdAt: DateTime!
+  id: ID!
+  name: String!
+  parentId: String
+}
+
+input CreateCompanyInput {
+  name: String!
+  parentId: String
+}
+
+input CreateTravelInput {
+  companyId: String!
+  departure: String!
+  destination: String!
+  employeeName: String!
+  price: Float!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Mutation {
+  createCompany(createCompanyInput: CreateCompanyInput!): Company!
+  createCompanyTravel(createCompanyTravelInput: CreateTravelInput!): Travel!
+  removeCompany(id: String!): String!
+  updateCompany(updateCompanyInput: UpdateCompanyInput!): Company!
+}
+
+type Query {
+  company(id: String!): Company!
+  companyTree: [Company!]!
+}
+
+type Travel {
+  companyId: String!
+  createdAt: DateTime!
+  departure: String!
+  destination: String!
+  employeeName: String!
+  id: ID!
+  price: Float!
+}
+
+input UpdateCompanyInput {
+  id: String!
+  name: String
+  parentId: String
+}
