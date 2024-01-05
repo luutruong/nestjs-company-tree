@@ -3,6 +3,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
   forwardRef,
 } from '@nestjs/common';
 import { CreateCompanyInput } from './dto/create-company.input';
@@ -12,13 +13,18 @@ import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model, Types } from 'mongoose';
 import { forEach } from 'lodash';
 import { TravelsService } from './travels.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CompaniesService {
+  private readonly logger = new Logger(CompaniesService.name);
+
   constructor(
     @InjectModel(Company.name) private companyModel: Model<Company>,
     @Inject(forwardRef(() => TravelsService))
     private readonly travelsService: TravelsService,
+    private readonly config: ConfigService,
   ) {}
 
   async create(createCompanyInput: CreateCompanyInput) {
@@ -57,6 +63,14 @@ export class CompaniesService {
     }
 
     return company;
+  }
+
+  async findOneBySource(sourceId: string) {
+    return await this.companyModel
+      .findOne({
+        sourceId,
+      })
+      .exec();
   }
 
   async update(id: string, updateCompanyInput: UpdateCompanyInput) {
@@ -145,6 +159,51 @@ export class CompaniesService {
     if (company.parentId) {
       // recursive update company cost
       await this.rebuildCompanyCost(company.parentId);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async fetchRemoteData() {
+    const mockDataUrl = this.config.get('COMPANY_SEEDING_DATA_API_URL');
+    if (!mockDataUrl) {
+      this.logger.debug('no mock data seeding url for company');
+      return;
+    }
+
+    this.logger.debug(`fetch companies remote data: ${mockDataUrl}`);
+
+    const resp = await fetch(mockDataUrl, {
+      method: 'GET',
+    });
+
+    const data: Array<{
+      id: string;
+      createdAt: string;
+      name: string;
+      parentId: string;
+    }> = await resp.json();
+
+    for await (const item of data) {
+      this.logger.debug('process remote company data', item);
+
+      const company = await this.findOneBySource(item.id);
+      const parent = await this.findOneBySource(item.parentId);
+
+      if (company) {
+        company.name = item.name;
+        company.parentId = (parent?._id ?? null) as any;
+
+        await company.save();
+      } else {
+        const newCompany = new this.companyModel({
+          sourceId: item.id,
+          name: item.name,
+          createdAt: new Date(item.createdAt),
+          parentId: parent?._id ?? null,
+        });
+
+        await newCompany.save();
+      }
     }
   }
 }

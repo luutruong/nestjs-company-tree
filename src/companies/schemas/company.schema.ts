@@ -12,8 +12,8 @@ export class Company {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ index: true })
-  parentId: MongooseSchema.Types.ObjectId;
+  @Prop({ index: true, nullable: true })
+  parentId?: MongooseSchema.Types.ObjectId | null;
 
   @Prop({ default: 0 })
   cost: MongooseSchema.Types.Number;
