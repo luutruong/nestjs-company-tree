@@ -2,7 +2,7 @@ import { ObjectType, Field, ID } from '@nestjs/graphql';
 
 @ObjectType()
 export class Company {
-  @Field((type) => ID)
+  @Field(() => ID)
   id: string;
 
   @Field()
@@ -17,6 +17,6 @@ export class Company {
   @Field()
   createdAt: Date;
 
-  @Field((type) => [Company], { nullable: true })
+  @Field(() => [Company], { nullable: true })
   children?: Company[];
 }

@@ -11,6 +11,8 @@ import { join } from 'path';
       `mongodb://${process.env.MONGODB_USER}:${process.env.MONGODB_PASSWORD}@mongodb:27017`,
       {
         dbName: process.env.MONGODB_DATABASE,
+        authMechanism: 'DEFAULT',
+        authSource: 'admin',
       },
     ),
     GraphQLModule.forRoot<ApolloDriverConfig>({

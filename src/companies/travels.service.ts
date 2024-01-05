@@ -1,8 +1,14 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import mongoose, { Model } from 'mongoose';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { forEach } from 'lodash';
-import { Travel } from './schemas/travel.schema';
+import { Travel, TravelDocument } from './schemas/travel.schema';
 import { CreateTravelInput } from './dto/create-travel.input';
 import { CompaniesService } from './companies.service';
 import { UpdateTravelInput } from './dto/update-travel.input';
@@ -11,7 +17,7 @@ import { UpdateTravelInput } from './dto/update-travel.input';
 export class TravelsService {
   constructor(
     @InjectModel(Travel.name) private travelModel: Model<Travel>,
-    @InjectConnection() private readonly connection: mongoose.Connection,
+    @Inject(forwardRef(() => CompaniesService))
     private readonly companiesService: CompaniesService,
   ) {}
 
@@ -23,18 +29,7 @@ export class TravelsService {
       companyId: company._id,
     });
 
-    const session = await this.connection.startSession();
-    session.startTransaction();
-
-    try {
-      await travel.save();
-      await this.updateCompanyCost(travel.companyId);
-    } catch (err) {
-      session.abortTransaction();
-      throw err;
-    } finally {
-      session.endSession();
-    }
+    await this.saveTravel(travel);
 
     return travel;
   }
@@ -59,35 +54,17 @@ export class TravelsService {
       travel[k] = v;
     });
 
-    const session = await this.connection.startSession();
-    session.startTransaction();
-
-    try {
-      await travel.save();
-      await this.updateCompanyCost(travel.companyId);
-    } catch (err) {
-      session.abortTransaction();
-      throw err;
-    } finally {
-      session.endSession();
-    }
+    await this.saveTravel(travel);
 
     return travel;
   }
 
-  async remove(id: string) {
-    const travel = await this.findOne(id);
-
-    await travel.deleteOne().exec();
-
-    return 'Company travel has been deleted';
-  }
-
-  async updateCompanyCost(companyId: string | mongoose.Schema.Types.ObjectId) {
+  private async saveTravel(travel: TravelDocument) {
+    await travel.save();
     const results = await this.travelModel.aggregate([
       {
         $match: {
-          companyId: companyId,
+          companyId: travel.companyId,
         },
       },
       {
@@ -100,13 +77,24 @@ export class TravelsService {
       },
     ]);
 
-    const company = await this.companiesService.findOne(String(companyId));
+    const company = await this.companiesService.findOne(
+      String(travel.companyId),
+    );
     company.cost = results.length > 0 ? results[0].cost : 0;
     await company.save();
-
     if (company.parentId) {
-      // recursive update company cost
-      await this.updateCompanyCost(company.parentId);
+      await this.companiesService.rebuildCompanyCost(company.parentId);
     }
+
+    return travel;
+  }
+
+  async remove(id: string) {
+    const travel = await this.findOne(id);
+
+    await travel.deleteOne().exec();
+    await this.companiesService.rebuildCompanyCost(travel.companyId);
+
+    return 'OK';
   }
 }

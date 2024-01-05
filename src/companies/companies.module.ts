@@ -22,6 +22,6 @@ import { TravelsService } from './travels.service';
     ]),
   ],
 
-  exports: [],
+  exports: [CompaniesService, TravelsService],
 })
 export class CompaniesModule {}

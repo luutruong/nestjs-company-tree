@@ -1,16 +1,24 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common';
 import { CreateCompanyInput } from './dto/create-company.input';
 import { UpdateCompanyInput } from './dto/update-company.input';
 import { Company } from './schemas/company.schema';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model, Types } from 'mongoose';
 import { forEach } from 'lodash';
+import { TravelsService } from './travels.service';
 
 @Injectable()
 export class CompaniesService {
   constructor(
     @InjectModel(Company.name) private companyModel: Model<Company>,
-    @InjectConnection() private readonly connection: mongoose.Connection,
+    @Inject(forwardRef(() => TravelsService))
+    private readonly travelsService: TravelsService,
   ) {}
 
   async create(createCompanyInput: CreateCompanyInput) {
@@ -35,7 +43,11 @@ export class CompaniesService {
   }
 
   companyTree() {
-    return this.companyModel.find().exec();
+    return this.companyModel
+      .where({
+        parentId: null,
+      })
+      .exec();
   }
 
   async findOne(id: string) {
@@ -49,6 +61,8 @@ export class CompaniesService {
 
   async update(id: string, updateCompanyInput: UpdateCompanyInput) {
     const company = await this.findOne(id);
+
+    const oldParentId = company.parentId;
 
     if (updateCompanyInput.parentId !== undefined) {
       if (updateCompanyInput.parentId === null) {
@@ -68,32 +82,31 @@ export class CompaniesService {
     });
 
     await company.save();
+    if (company.parentId) {
+      await this.rebuildCompanyCost(company.parentId);
+    }
 
-    return await this.findOne(company._id.toString());
+    if (oldParentId) {
+      await this.rebuildCompanyCost(oldParentId);
+    }
+
+    return company;
   }
 
   async remove(id: string) {
     const company = await this.findOne(id);
 
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    await company.deleteOne().exec();
+    await this.removeChildren(company._id);
 
-    try {
-      await company.deleteOne().exec();
-      await this.removeChildren(company._id);
-
-      await session.commitTransaction();
-
-      return 'Company has been deleted';
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+    if (company.parentId) {
+      await this.rebuildCompanyCost(company.parentId);
     }
+
+    return 'OK';
   }
 
-  async removeChildren(parentId: Types.ObjectId) {
+  private async removeChildren(parentId: Types.ObjectId) {
     const children = await this.companyModel
       .where({
         parentId,
@@ -103,6 +116,33 @@ export class CompaniesService {
     for await (const child of children) {
       await child.deleteOne().exec();
       await this.removeChildren(child._id);
+    }
+  }
+
+  async rebuildCompanyCost(companyId: string | mongoose.Schema.Types.ObjectId) {
+    const results = await this.companyModel.aggregate([
+      {
+        $match: {
+          parentId: companyId,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          cost: {
+            $sum: '$cost',
+          },
+        },
+      },
+    ]);
+
+    const company = await this.companyModel.findById(String(companyId));
+    company.cost = results.length > 0 ? results[0].cost : 0;
+    await company.save();
+
+    if (company.parentId) {
+      // recursive update company cost
+      await this.rebuildCompanyCost(company.parentId);
     }
   }
 }
