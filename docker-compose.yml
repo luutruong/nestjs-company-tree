@@ -9,10 +9,6 @@ services:
       - 3000:3000
     volumes:
       - ./:/app
-    environment:
-      MONGODB_USER: 'root'
-      MONGODB_PASSWORD: 'password'
-      MONGODB_DATABASE: 'company-tree'
   mongodb:
     image: mongo:5.0.12
     volumes:

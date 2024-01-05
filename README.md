@@ -16,6 +16,9 @@ docker-compose build
 yarn run start:dev
 ```
 
+Note: Without docker you must provide mongodb configuration.
+
+
 With docker:
 
 ```sh
@@ -30,6 +33,16 @@ Create new file `.env` in the root directory
 ```
 COMPANY_SEEDING_DATA_API_URL=
 COMPANY_TRAVEL_SEEDING_DATA_API_URL=
+
+MONGODB_USER=root
+MONGODB_PASSWORD=password
+MONGODB_DATABASE=company-tree
+```
+
+## Tests
+
+```sh
+yarn test:e2e
 ```
 
 ## API
