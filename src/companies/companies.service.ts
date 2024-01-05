@@ -97,6 +97,7 @@ export class CompaniesService {
     const company = await this.findOne(id);
 
     await company.deleteOne().exec();
+    await this.travelsService.removeAllCompanyTravels(company._id);
     await this.removeChildren(company._id);
 
     if (company.parentId) {
@@ -115,6 +116,7 @@ export class CompaniesService {
 
     for await (const child of children) {
       await child.deleteOne().exec();
+      await this.travelsService.removeAllCompanyTravels(child._id);
       await this.removeChildren(child._id);
     }
   }

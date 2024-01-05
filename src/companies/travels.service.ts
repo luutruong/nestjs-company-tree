@@ -6,7 +6,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { forEach } from 'lodash';
 import { Travel, TravelDocument } from './schemas/travel.schema';
 import { CreateTravelInput } from './dto/create-travel.input';
@@ -96,5 +96,13 @@ export class TravelsService {
     await this.companiesService.rebuildCompanyCost(travel.companyId);
 
     return 'OK';
+  }
+
+  removeAllCompanyTravels(companyId: string | Types.ObjectId) {
+    return this.travelModel
+      .deleteMany({
+        companyId,
+      })
+      .exec();
   }
 }
